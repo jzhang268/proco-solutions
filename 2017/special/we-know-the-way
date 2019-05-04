@@ -1,0 +1,367 @@
+// input values set as answers
+/*
+################################################################################
+################################### README #####################################
+################################################################################
+#
+# You can ignore most of this file -- jump to line 260 and below for the actual
+# assembly code.
+# 
+# The assembly code uses 10 registers (denoted by lowercase letters a-k), which
+# can be thought of as variables or buckets for storing values. The locks work
+# by modifying these registers through a limited set of commands:
+#
+# SET <register> <value>:           assigns <value> to <register>
+#
+# INPUT <register>:                 gets user input and assigns it to <register>
+#
+# COPY <register1> <register2>:     copies the value of <register2> into
+#                                   <register1>
+#
+# ADD <register1> <register2>:      adds the value of <register2> to <register1>,
+#                                   with the result stored in <register1>
+#
+# SUBTRACT <register1> <register2>: subtract the value of <register2> from
+#                                   <register1>, with the result stored in
+#                                   <register1>
+#
+# INCREMENT <register>:             increments the value stored in <register> by 1
+#
+# DECREMENT <register>:             decrements the value stored in <register> by 1
+#
+# LABEL <label>:                    denotes the label <label> at the current
+#                                   instruction. Used for jumping
+#
+# JUMP <label>:                     jumps to the instruction denoted by <label>
+#
+# JUMP_ZERO <register> <label>:     jumps to the instruction denoted by <label>
+#                                   if <register> stores 0, and does nothing
+#                                   otherwise
+#
+# EXPLODE:                          explodes the lock. Failure!
+#
+# UNLOCK:                           unlocks the lock. Success!
+#
+# RETURN:                           ends the program
+#
+# Example assembly code: each command is executed in order from top to bottom
+# until completion.
+#    INPUT a            # Asks for user input, and stores input into register a
+#    JUMP_ZERO a B      # If a is 0, move to the instruction denoted by label
+#                       # B. Otherwise, move to the next instruction (EXPLODE in
+#                       # this case).
+#    EXPLODE            # Explodes the lock.
+#    LABEL B            # Signifies label B.
+#    UNLOCK             # Unlocks the lock.
+#
+# Other Notes:
+# - Labels are denoted by uppercase letters, and are primarily used for jumping
+#   between different lines of assembly code.
+# - You can edit any part of this file to help debug and understand the
+#   code/assembly. You can even edit the assembly code to change the logic of
+#   the locks and make them easier to unlock. However, this file only provides a
+#   simulation -- you can't edit the logic of the original barriers directly,
+#   and you have to find the input keys to the original barriers to solve this
+#   problem!
+#
+################################################################################
+*/
+
+#include <iterator>
+#include <iostream>
+#include <vector>
+#include <math.h>
+#include <map>
+#include <sstream>
+#include <string>
+#include <stdlib.h>
+
+using namespace std;
+
+class AssemblyState {
+    map<char,int> registers;
+    int curr_statement;
+    map<char,int> labels;
+  public:
+    AssemblyState ();
+    void parse_labels(vector<vector<string> >& commands);
+    void run_commands(vector<vector<string> >& commands);
+    void asm_set(vector<string> &command);
+    void asm_input(vector<string> &command);
+    void asm_copy(vector<string> &command);
+    void asm_label(vector<string> &command);
+    void asm_jump(vector<string> &command);
+    void asm_jump_zero(vector<string> &command);
+    void asm_jump_neg(vector<string> &command);
+    void asm_add(vector<string> &command);
+    void asm_subtract(vector<string> &command);
+    void asm_increment(vector<string> &command);
+    void asm_decrement(vector<string> &command);
+    void asm_output(vector<string> &command);
+    void asm_explode(vector<string> &command);
+    void asm_unlock(vector<string> &command);
+};
+
+AssemblyState::AssemblyState() {
+    for(char c = 'a'; c <= 'k'; c++) {
+        registers.insert(pair<char,int>(c, 0));
+    }
+    curr_statement = 0;
+}
+
+void AssemblyState::parse_labels(vector<vector<string> >& commands) {
+    int num_input = 0;
+    for(int i = 0; i < commands.size(); i++) {
+        if(commands[i][0].compare("LABEL") == 0) {
+            labels.insert(pair<char,int>(commands[i][1].at(0), i));
+        } else if(commands[i][0].compare("INPUT") == 0) {
+            num_input++;
+        }
+    }
+
+    string value_str = " value";
+    if(num_input > 1) value_str += "s separated by newlines";
+    cout << "Input " << num_input << value_str << endl;
+}
+
+void AssemblyState::run_commands(vector<vector<string> >& commands) {
+    while(curr_statement < commands.size()) {
+        string instruction = commands[curr_statement][0];
+        if(instruction.compare("RETURN") == 0)
+            return;
+        else if(instruction.compare("SET") == 0)
+            asm_set(commands[curr_statement]);
+        else if(instruction.compare("INPUT") == 0)
+            asm_input(commands[curr_statement]);
+        else if(instruction.compare("COPY") == 0)
+            asm_copy(commands[curr_statement]);
+        else if(instruction.compare("LABEL") == 0)
+            asm_label(commands[curr_statement]);
+        else if(instruction.compare("JUMP") == 0)
+            asm_jump(commands[curr_statement]);
+        else if(instruction.compare("JUMP_ZERO") == 0)
+            asm_jump_zero(commands[curr_statement]);
+        else if(instruction.compare("JUMP_NEG") == 0)
+            asm_jump_neg(commands[curr_statement]);
+        else if(instruction.compare("ADD") == 0)
+            asm_add(commands[curr_statement]);
+        else if(instruction.compare("SUBTRACT") == 0)
+            asm_subtract(commands[curr_statement]);
+        else if(instruction.compare("INCREMENT") == 0)
+            asm_increment(commands[curr_statement]);
+        else if(instruction.compare("DECREMENT") == 0)
+            asm_decrement(commands[curr_statement]);
+        else if(instruction.compare("EXPLODE") == 0)
+            asm_explode(commands[curr_statement]);
+        else if(instruction.compare("UNLOCK") == 0)
+            asm_unlock(commands[curr_statement]);
+        else if(instruction.compare("OUTPUT") == 0)
+            asm_output(commands[curr_statement]);
+        else {
+            cerr << "Error: did not understand " << instruction << "!\n";
+            return;
+        }
+
+        curr_statement++;
+    }
+}
+
+
+/* The following functions contain logic for each assembly command. This may
+ * help with understanding what each of the commands do.
+ */
+void AssemblyState::asm_set(vector<string>& command) {
+    registers[command[1].at(0)] = atoi(command[2].c_str());
+}
+
+void AssemblyState::asm_input(vector<string>& command) {
+    cin >> registers[command[1].at(0)];
+}
+
+void AssemblyState::asm_copy(vector<string>& command) {
+    registers[command[1].at(0)] = registers[command[2].at(0)];
+}
+
+void AssemblyState::asm_label(vector<string>& command) {
+    // do nothing
+}
+
+void AssemblyState::asm_jump(vector<string>& command) {
+    curr_statement = labels[command[1].at(0)];
+}
+
+void AssemblyState::asm_jump_zero(vector<string>& command) {
+    if(registers[command[1].at(0)] == 0)
+        curr_statement = labels[command[2].at(0)];
+}
+
+void AssemblyState::asm_jump_neg(vector<string>& command) {
+    if(registers[command[1].at(0)] < 0)
+        curr_statement = labels[command[2].at(0)];
+}
+
+void AssemblyState::asm_add(vector<string>& command) {
+    registers[command[1].at(0)] += registers[command[2].at(0)];
+}
+
+void AssemblyState::asm_subtract(vector<string>& command) {
+    registers[command[1].at(0)] -= registers[command[2].at(0)];
+}
+
+void AssemblyState::asm_increment(vector<string>& command) {
+    registers[command[1].at(0)]++;
+}
+
+void AssemblyState::asm_decrement(vector<string>& command) {
+    registers[command[1].at(0)]--;
+}
+
+void AssemblyState::asm_output(vector<string>& command) {
+    cout << command[1] << endl;
+}
+
+void AssemblyState::asm_explode(vector<string>& command) {
+    cout << "BOOM! You and the lock were vaporized!\n";
+    exit(0);
+}
+
+void AssemblyState::asm_unlock(vector<string>& command) {
+    cout << "Unlocked! Proceed!\n";
+}
+
+template<typename Out>
+void split(const string &s, char delim, Out result) {
+    stringstream ss;
+    ss.str(s);
+    string item;
+    while (std::getline(ss, item, delim)) {
+        *(result++) = item;
+    }
+}
+
+vector<string> split(const string &s, char delim) {
+    vector<string> elems;
+    split(s, delim, back_inserter(elems));
+    return elems;
+}
+
+/* Processes and parses the commands to be run. If the lock explodes, the
+ * program will halt.
+ */
+void run_assembly(const string *commands, int num_commands) {
+    AssemblyState state;
+    vector<vector<string> > parsed_commands;
+    for(int i = 0; i < num_commands; i++) {
+        parsed_commands.push_back(split(commands[i], ' '));
+    }
+    state.parse_labels(parsed_commands);
+    state.run_commands(parsed_commands);
+}
+
+/*************************************
+ * Actual assembly code starts here! *
+ *************************************/
+const string commands1[] = {
+    "SET a 10",
+    // "INPUT b",
+    "SET b 10",
+    "SUBTRACT b a",
+    "JUMP_ZERO b A",
+    "EXPLODE",
+    "RETURN",
+    "LABEL A",
+    "UNLOCK"
+};
+
+const string commands2[] = {
+    "SET a 246",
+    "SET b 791",
+    // "INPUT d",
+    "SET d 1283",
+    "COPY e d",
+    "SUBTRACT e a",
+    "ADD e e",
+    "SUBTRACT e b",
+    "SUBTRACT d e",
+    "JUMP_ZERO d A",
+    "EXPLODE",
+    "RETURN",
+    "LABEL A",
+    "UNLOCK"
+};
+
+const string commands3[] = {
+    "SET e 0",
+    "SET f 15376",
+    // "INPUT a",
+    // "INPUT b",
+    "SET a 124",
+    "SET b 124",
+    "COPY c b",
+    "SUBTRACT c a",
+    "JUMP_ZERO c A",
+    "JUMP C",
+    "LABEL A",
+    "LABEL B",
+    "JUMP_ZERO a C",
+    "ADD e b",
+    "DECREMENT a",
+    "JUMP B",
+    "LABEL C",
+    "SUBTRACT e f",
+    "JUMP_ZERO e D",
+    "EXPLODE",
+    "RETURN",
+    "LABEL D",
+    "UNLOCK"
+};
+
+const string commands4[] = {
+    "SET g 10",
+    "SET h 7",
+    "SET j 138",
+    "SET i 6",
+    // "INPUT a",
+    // "INPUT b",
+    "SET a 91",
+    "SET b 7",
+    "SET d 0",
+    "COPY e a",
+    "LABEL A",
+    "JUMP_ZERO b B",
+    "ADD e g",
+    "INCREMENT d",
+    "DECREMENT b",
+    "JUMP A",
+    "LABEL B",
+    "SUBTRACT d h",
+    "JUMP_ZERO d C",
+    "SET c 0",
+    "JUMP Z",
+    "LABEL C",
+    "COPY f d",
+    "SUBTRACT f j",
+    "JUMP_ZERO f D",
+    "ADD d i",
+    "ADD c h",
+    "JUMP C",
+    "LABEL D",
+    "SUBTRACT c e",
+    "JUMP_ZERO c E",
+    "JUMP Z",
+    "LABEL E",
+    "UNLOCK",
+    "RETURN",
+    "LABEL Z",
+    "EXPLODE"
+};
+
+/* Runs each of the locks in order, with each lock represented by a list of
+ * commands (commands1, commands2, commands3, commands4).
+ */
+int main() {
+    run_assembly(commands1, 8);
+    run_assembly(commands2, 13);
+    run_assembly(commands3, 21);
+    run_assembly(commands4, 35);
+}
